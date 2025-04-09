@@ -1,0 +1,17 @@
+apiVersion: 1
+
+datasources:
+  - name: PostgreSQL
+    uid: my-postgres
+    type: postgres
+    url: postgres:5432
+    database: logs_db
+    user: postgres
+    secureJsonData:
+      password: password
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1200
+      timeInterval: "1s"
+    isDefault: true
+

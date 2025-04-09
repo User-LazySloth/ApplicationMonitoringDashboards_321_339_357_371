@@ -1,0 +1,10 @@
+# grafana/provisioning/datasources/prometheus.yml
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometh
+    type: prometheus
+    url: http://prometheus:9090
+    access: proxy
+    isDefault: false
