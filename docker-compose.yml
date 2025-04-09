@@ -12,7 +12,32 @@ services:
     depends_on:
       - kafka
       - postgres
-  
+    volumes:
+      - ./api/logs:/api
+
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./loki:/etc/loki
+    networks:
+      - monitoring-network
+
+  promtail:
+    image: grafana/promtail:latest
+    volumes:
+      - ./promtail:/etc/promtail
+      - /var/log:/var/log
+      - ./api/logs:/var/log/api
+      - ./consumer/logs:/var/log/consumer
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - monitoring-network
+    depends_on:
+      - loki
+
   kafka:
     image: bitnami/kafka:latest
     environment:
@@ -49,8 +74,53 @@ services:
     networks:
       - monitoring-network
   
+  consumer:
+    build: ./consumer
+    networks:
+      - monitoring-network
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=logs_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    depends_on:
+      - kafka
+      - postgres
+    volumes:
+      - ./consumer/logs:/consumer
+  
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus:/etc/prometheus
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - monitoring-network
+  
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=admin
+    networks:
+      - monitoring-network
+    depends_on:
+      - loki
+      - prometheus
+  
 
 networks:
   monitoring-network:
     driver: bridge
 
+volumes:
+  postgres-data:
+  grafana-data:

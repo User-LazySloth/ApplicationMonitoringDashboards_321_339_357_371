@@ -1,4 +1,3 @@
-
 from kafka import KafkaConsumer
 import json
 import logging
@@ -6,6 +5,9 @@ import psycopg2
 from psycopg2 import sql
 import os
 import time
+
+import logging
+from logging.handlers import RotatingFileHandler
 
 logging.basicConfig(level=logging.INFO)
 
@@ -108,9 +110,6 @@ def consume_logs():
             'auto_offset_reset': 'earliest',
             'value_deserializer': lambda x: json.loads(x.decode('utf-8')),
             'api_version': (2, 5, 0),
-            'fetch_max_bytes': 10485760,
-            'max_partition_fetch_bytes': 10485760,
-            'request_timeout_ms': 30000
         }
 
         log_consumer = KafkaConsumer('application_logs', **consumer_config)
@@ -134,5 +133,18 @@ def consume_logs():
         consume_logs()  
 
 
+def setup_logging():
+    log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    
+    file_handler = RotatingFileHandler('/consumer/consumer.log', maxBytes=1024*1024, backupCount=5)
+    file_handler.setFormatter(log_formatter)
+    file_handler.setLevel(logging.INFO)
+    
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    logger.addHandler(file_handler)
+
+
 if __name__ == '__main__':
+    setup_logging()
     consume_logs()
