@@ -64,9 +64,10 @@ RESPONSE_TIME = Summary(
 
 try:
     producer = KafkaProducer(
-        bootstrap_servers=[os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'kafka:9092')],
+        bootstrap_servers=os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'kafka:9092').split(','),
         value_serializer=lambda v: json.dumps(v).encode('utf-8'),
         api_version=(2, 5, 0),
+        key_serializer = lambda k: k.encode('utf-8') if k else None
     )
     logging.info("Kafka Producer initialized successfully")
 except Exception as e:
@@ -84,16 +85,12 @@ def metrics():
 
 @app.route('/api/<endpoint>', methods=['GET', 'POST', 'PATCH', "PUT", "DELETE"])
 def handle_request(endpoint):
-    # Track in-progress requests
     IN_PROGRESS_REQUESTS.inc()
 
-    # Record request size if available
     REQUEST_SIZE.labels(method=request.method, endpoint=endpoint).observe(request.content_length or 0)
 
-    # Track endpoint usage
     ENDPOINT_USAGE.labels(endpoint=endpoint).inc()
 
-    # Initial request count with 404
     REQUEST_COUNT.labels(method=request.method, endpoint=endpoint, http_status=404).inc()
 
     if endpoint not in ENDPOINTS:
@@ -108,7 +105,7 @@ def handle_request(endpoint):
 
         if producer:
             try:
-                producer.send(ERROR_TOPIC, error_log)
+                producer.send(ERROR_TOPIC, key=endpoint, value=error_log)
                 producer.flush()
                 logging.info(f"Error log sent to Kafka: {error_log}")
             except Exception as e:
@@ -117,15 +114,12 @@ def handle_request(endpoint):
         IN_PROGRESS_REQUESTS.dec()
         return jsonify({"error": "Invalid endpoint"}), 404
 
-    # Update request count to success
     REQUEST_COUNT.labels(method=request.method, endpoint=endpoint, http_status=200).inc()
 
-    # Measure latency and response time
     with REQUEST_LATENCY.labels(method=request.method, endpoint=endpoint).time():
         request_id = str(uuid.uuid4())
         response_time = random.uniform(10, 500)
 
-        # Track response time
         RESPONSE_TIME.labels(method=request.method, endpoint=endpoint).observe(response_time)
 
         log_entry = {
@@ -138,7 +132,7 @@ def handle_request(endpoint):
 
         if producer:
             try:
-                producer.send(LOG_TOPIC, log_entry)
+                producer.send(LOG_TOPIC, key=endpoint, value=log_entry)
                 producer.flush()
                 logging.info(f"Log sent to Kafka: {log_entry}")
             except Exception as e:

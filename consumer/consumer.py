@@ -101,31 +101,33 @@ def consume_logs():
     wait_for_postgres()
     create_tables()
 
-    kafka_bootstrap_servers = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'kafka:9092')
+    kafka_bootstrap_servers = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'kafka:9092').split(',')
 
+    logging.info(f"Kafka bootstrap servers: {kafka_bootstrap_servers}")
     try:
         consumer_config = {
-            'bootstrap_servers': [kafka_bootstrap_servers],
+            'bootstrap_servers': kafka_bootstrap_servers,
             'group_id': 'log-processing-group',
             'auto_offset_reset': 'earliest',
             'value_deserializer': lambda x: json.loads(x.decode('utf-8')),
+            'key_deserializer': lambda x: x.decode('utf-8') if x else None,
             'api_version': (2, 5, 0),
         }
 
-        log_consumer = KafkaConsumer('application_logs', **consumer_config)
-        error_consumer = KafkaConsumer('application_errors', **consumer_config)
+        consumer = KafkaConsumer(**consumer_config)
+        consumer.subscribe(["application_logs", "application_errors"])
 
-        logging.info("Kafka consumers initialized successfully")
 
-        for message in log_consumer:
-            log_entry = message.value
-            logging.info(f"Received log: {log_entry}")
-            insert_log(log_entry)
+        for message in consumer:
+            if message.topic == 'application_logs':
+                log_entry = message.value
+                logging.info(f"Received log: {log_entry}")
+                insert_log(log_entry)
+            elif message.topic == 'application_errors':
+                error_entry = message.value
+                logging.info(f"Received error: {error_entry}")
+                insert_error(error_entry)
 
-        for message in error_consumer:
-            error_entry = message.value
-            logging.info(f"Received error: {error_entry}")
-            insert_error(error_entry)
 
     except Exception as e:
         logging.error(f"Error in Kafka consumer: {e}")
